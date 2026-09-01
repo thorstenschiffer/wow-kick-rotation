@@ -1,0 +1,8 @@
+## Interface: 120100
+## Title: Kick Rotation
+## Notes: Shows the current kick-rotation number above raid-marked nameplates.
+## Author: Thorsten Schiffer
+## Version: 1.0
+## SavedVariables: KickRotationDB
+
+Core.lua

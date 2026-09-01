@@ -1,0 +1,5 @@
+<Bindings>
+	<Binding name="KICKROTATION_RESET" header="KICKROTATION" category="AddOns">
+		KickRotation_Reset()
+	</Binding>
+</Bindings>
