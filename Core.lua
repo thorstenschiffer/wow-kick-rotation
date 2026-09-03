@@ -17,11 +17,16 @@
 local DEFAULT_KICKERS = 3
 local BOX_SIZE, BOX_OFFSET_Y = 36, 18
 
--- The box sits on top of whatever the world looks like, so contrast comes from
--- a near-opaque dark plate; the border colour carries the cast state.
-local BACKDROP = { 0.04, 0.04, 0.05, 0.92 }
-local IDLE = { 0.60, 0.45, 0.15, 1 }
-local ACTIVE = { 1.00, 0.75, 0.20, 1 }
+-- Red plate, white border, white text. The border stays white, so the cast
+-- state is carried by how bright the red is.
+local BORDER = { 1, 1, 1, 1 }
+local IDLE = { 0.50, 0.04, 0.04, 0.92 }
+local ACTIVE = { 0.92, 0.11, 0.11, 0.96 }
+
+-- Nameplates sit low and overlap each other constantly. DIALOG lifts the box
+-- clear of all of them; SetFixedFrameStrata stops the nameplate parent from
+-- pulling it back down, and the high level sorts it above sibling boxes.
+local STRATA, LEVEL = "DIALOG", 6200
 
 local current = 1
 local boxes = {}    -- unit token -> frame
@@ -43,7 +48,6 @@ local function AcquireBox(unit)
 
 	box = CreateFrame("Frame", nil, UIParent)
 	box:SetSize(BOX_SIZE, BOX_SIZE)
-	box:SetFrameStrata("HIGH")
 
 	box.border = box:CreateTexture(nil, "BACKGROUND", nil, -2)
 	box.border:SetPoint("TOPLEFT", -2, 2)
@@ -51,7 +55,8 @@ local function AcquireBox(unit)
 
 	box.bg = box:CreateTexture(nil, "BACKGROUND", nil, -1)
 	box.bg:SetAllPoints()
-	box.bg:SetColorTexture(unpack(BACKDROP))
+
+	box.border:SetColorTexture(unpack(BORDER))
 
 	box.label = box:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
 	box.label:SetPoint("CENTER")
@@ -83,8 +88,15 @@ local function Refresh(unit)
 	box:ClearAllPoints()
 	box:SetPoint("BOTTOM", plate, "TOP", 0, BOX_OFFSET_Y)
 
+	-- Reapplied after every SetParent: parenting can reset both of these.
+	box:SetFrameStrata(STRATA)
+	if box.SetFixedFrameStrata then
+		box:SetFixedFrameStrata(true)
+	end
+	box:SetFrameLevel(LEVEL)
+
 	local c = casting[unit] and ACTIVE or IDLE
-	box.border:SetColorTexture(c[1], c[2], c[3], c[4])
+	box.bg:SetColorTexture(c[1], c[2], c[3], c[4])
 	box.label:SetText(current)
 	box:Show()
 end
