@@ -382,6 +382,16 @@ local function ShowBanner(text, seconds)
 	banner.timer = C_Timer.NewTimer(seconds, function() banner:Hide() end)
 end
 
+-- Shown three times: when the assignment is made at the ready check, again when
+-- the key actually starts (minutes may have passed), and on demand.
+local function ShowAssignment(seconds)
+	if DB().position then
+		ShowBanner(format("|cff40ff40You are kicker %d|r  of %d", DB().position, Kickers()), seconds)
+	else
+		ShowBanner("|cffff8040You are not in the kick rotation|r", seconds)
+	end
+end
+
 local function AnnounceRoster()
 	rosterPending = false
 
@@ -409,12 +419,7 @@ local function AnnounceRoster()
 		print(format("  -- %s (addon, no interrupt)", name))
 	end
 
-	if DB().position then
-		ShowBanner(format("|cff40ff40You are kicker %d|r  of %d",
-			DB().position, #kickers), 12)
-	else
-		ShowBanner("|cffff8040You are not in the kick rotation|r", 8)
-	end
+	ShowAssignment(12)
 	RefreshAll()
 end
 
@@ -432,6 +437,10 @@ function handlers.READY_CHECK()
 		C_Timer.After(ROSTER_WINDOW, AnnounceRoster)
 	end
 	C_ChatInfo.SendAddonMessage(PREFIX, "HI:" .. UnitName("player") .. ":" .. mine, "PARTY")
+end
+
+function handlers.CHALLENGE_MODE_START()
+	ShowAssignment(10)
 end
 
 function handlers.CHAT_MSG_ADDON(prefix, text)
@@ -499,6 +508,10 @@ SlashCmdList.KICKROTATION = function(msg)
 		print("|cffffcc00KickRotation|r mode: " .. Mode() .. ".")
 		return
 	end
+	if msg == "show" then
+		ShowAssignment(10)
+		return
+	end
 	if msg == "reset" then
 		KickRotation_Reset()
 		print("|cffffcc00KickRotation|r reset to 1.")
@@ -510,5 +523,6 @@ SlashCmdList.KICKROTATION = function(msg)
 		.. ", you: " .. me .. ", your interrupt: " .. spell)
 	print("  /kickrot <n>  kicker count   |  /kickrot me <n>  your own position")
 	print("  /kickrot spell <name|id>  your interrupt, for the cooldown display")
-	print("  /kickrot mode global|mob  |  /kickrot reset")
+	print("  /kickrot show  your position as a banner  |  /kickrot reset")
+	print("  /kickrot mode global|mob")
 end

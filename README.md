@@ -27,6 +27,7 @@ addon can only tell that a mob is marked, never which icon it carries.
 - `/kickrot spell Mind Freeze` — your interrupt, by name or ID
 - `/kickrot mode global` — one shared number on every marked mob
 - `/kickrot mode mob` — one counter per marked mob (default)
+- `/kickrot show` — show your position again
 - `/kickrot reset` — start over
 - Keybind under Key Bindings → AddOns → Kick Rotation
 
@@ -50,7 +51,9 @@ kicker count — without anyone typing anything. The chat list also shows who do
 *not* have it, which is easier to notice before the pull than during it.
 
 The assignment also appears as a banner in the middle of the screen — "You are
-kicker 2 of 3" — because a chat line is gone by the time the pull starts.
+kicker 2 of 3" — because a chat line is gone by the time the pull starts. It is
+shown again when the key actually starts, since minutes can pass in between, and
+`/kickrot show` brings it back on demand.
 
 The ready check has to happen before the key is started: addon messaging is
 locked down while a run is underway, and the addon says so rather than failing
