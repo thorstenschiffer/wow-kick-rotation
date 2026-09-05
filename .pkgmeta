@@ -1,0 +1,5 @@
+package-as: KickRotation
+
+ignore:
+  - README.md
+  - .github

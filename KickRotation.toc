@@ -2,7 +2,7 @@
 ## Title: Kick Rotation
 ## Notes: Shows the current kick-rotation number above raid-marked nameplates.
 ## Author: Thorsten Schiffer
-## Version: 1.0
+## Version: @project-version@
 ## SavedVariables: KickRotationDB
 
 Core.lua
