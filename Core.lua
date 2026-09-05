@@ -28,7 +28,9 @@ local ACTIVE = { 0.92, 0.11, 0.11, 0.96 }
 -- pulling it back down, and the high level sorts it above sibling boxes.
 local STRATA, LEVEL = "DIALOG", 6200
 
-local current = 1
+local current = 1   -- global mode: the one number everybody sees
+local nextStart = 1 -- per-mob mode: start number handed to the next marked mob
+local counters = {} -- per-mob mode: unit token -> that mob's number
 local boxes = {}    -- unit token -> frame
 local tracked = {}  -- unit token -> true
 local casting = {}  -- unit token -> true while an interruptible cast is up
@@ -47,6 +49,25 @@ end
 local function Kickers()
 	local n = tonumber(DB().kickers)
 	return (n and n >= 1) and n or DEFAULT_KICKERS
+end
+
+local function Mode()
+	return DB().mode == "global" and "global" or "per-mob"
+end
+
+-- The number to show on one nameplate. In per-mob mode a newly marked mob is
+-- handed the next start number, so two marked mobs never open on the same
+-- kicker. Note the side effect: first call for a unit assigns its counter.
+local function Number(unit)
+	if Mode() == "global" then return current end
+
+	local n = counters[unit]
+	if not n then
+		n = nextStart
+		counters[unit] = n
+		nextStart = nextStart % Kickers() + 1
+	end
+	return n
 end
 
 local function IsNameplate(unit)
@@ -108,7 +129,7 @@ local function Refresh(unit)
 
 	local c = casting[unit] and ACTIVE or IDLE
 	box.bg:SetColorTexture(c[1], c[2], c[3], c[4])
-	box.label:SetText(current)
+	box.label:SetText(Number(unit))
 	box:Show()
 end
 
@@ -118,13 +139,22 @@ local function RefreshAll()
 	end
 end
 
-local function Advance()
-	current = current % Kickers() + 1
-	RefreshAll()
+local function Advance(unit)
+	if Mode() == "global" then
+		current = current % Kickers() + 1
+		RefreshAll()
+		return
+	end
+
+	local n = counters[unit]
+	if n then
+		counters[unit] = n % Kickers() + 1
+		Refresh(unit)
+	end
 end
 
 function KickRotation_Reset()
-	current = 1
+	current, nextStart, counters = 1, 1, {}
 	RefreshAll()
 end
 
@@ -138,7 +168,8 @@ function handlers.NAME_PLATE_UNIT_ADDED(unit)
 end
 
 function handlers.NAME_PLATE_UNIT_REMOVED(unit)
-	tracked[unit], casting[unit] = nil, nil
+	-- The token is a slot, not a mob: once it is released its counter is gone.
+	tracked[unit], casting[unit], counters[unit] = nil, nil, nil
 	local box = boxes[unit]
 	if box then
 		box:Hide()
@@ -171,7 +202,7 @@ local function CastEnded(unit, advance)
 	local wasCasting = casting[unit]
 	casting[unit] = nil
 	if advance and wasCasting then
-		Advance()
+		Advance(unit)
 	else
 		Refresh(unit)
 	end
@@ -209,11 +240,18 @@ SlashCmdList.KICKROTATION = function(msg)
 		print("|cffffcc00KickRotation|r kickers set to " .. Kickers() .. ".")
 		return
 	end
+	if msg == "mode global" or msg == "mode mob" then
+		DB().mode = (msg == "mode global") and "global" or "per-mob"
+		KickRotation_Reset()
+		print("|cffffcc00KickRotation|r mode: " .. Mode() .. ".")
+		return
+	end
 	if msg == "reset" then
 		KickRotation_Reset()
 		print("|cffffcc00KickRotation|r reset to 1.")
 		return
 	end
-	print("|cffffcc00KickRotation|r /kickrot <n> sets the number of kickers (now "
-		.. Kickers() .. "), /kickrot reset sets the counter back to 1.")
+	print("|cffffcc00KickRotation|r kickers: " .. Kickers() .. ", mode: " .. Mode()
+		.. ". /kickrot <n> sets the kicker count, /kickrot mode global|mob switches"
+		.. " between one shared number and one per marked mob, /kickrot reset starts over.")
 end
