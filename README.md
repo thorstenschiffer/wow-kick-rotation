@@ -49,6 +49,9 @@ the same names, and each derives the same assignment — positions 1..N and the
 kicker count — without anyone typing anything. The chat list also shows who does
 *not* have it, which is easier to notice before the pull than during it.
 
+The assignment also appears as a banner in the middle of the screen — "You are
+kicker 2 of 3" — because a chat line is gone by the time the pull starts.
+
 The ready check has to happen before the key is started: addon messaging is
 locked down while a run is underway, and the addon says so rather than failing
 quietly.

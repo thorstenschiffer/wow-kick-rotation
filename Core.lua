@@ -355,6 +355,33 @@ end
 local roster = {}
 local rosterPending = false
 
+-- An on-screen banner, not just a chat line: the assignment is handed out at the
+-- ready check and has to survive being scrolled away before the pull.
+local banner
+
+local function ShowBanner(text, seconds)
+	if not banner then
+		banner = CreateFrame("Frame", nil, UIParent)
+		banner:SetSize(520, 64)
+		banner:SetPoint("TOP", UIParent, "TOP", 0, -180)
+		banner:SetFrameStrata("DIALOG")
+
+		banner.bg = banner:CreateTexture(nil, "BACKGROUND")
+		banner.bg:SetAllPoints()
+		banner.bg:SetColorTexture(0.04, 0.04, 0.05, 0.80)
+
+		banner.text = banner:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+		banner.text:SetPoint("CENTER")
+		banner:Hide()
+	end
+
+	banner.text:SetText(text)
+	banner:Show()
+
+	if banner.timer then banner.timer:Cancel() end
+	banner.timer = C_Timer.NewTimer(seconds, function() banner:Hide() end)
+end
+
 local function AnnounceRoster()
 	rosterPending = false
 
@@ -380,6 +407,13 @@ local function AnnounceRoster()
 	end
 	for _, name in ipairs(benched) do
 		print(format("  -- %s (addon, no interrupt)", name))
+	end
+
+	if DB().position then
+		ShowBanner(format("|cff40ff40You are kicker %d|r  of %d",
+			DB().position, #kickers), 12)
+	else
+		ShowBanner("|cffff8040You are not in the kick rotation|r", 8)
 	end
 	RefreshAll()
 end
