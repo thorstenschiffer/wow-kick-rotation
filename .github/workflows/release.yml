@@ -8,6 +8,9 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # The default workflow token is read-only; creating a release needs write.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
