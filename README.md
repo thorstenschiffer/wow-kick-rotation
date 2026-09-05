@@ -42,10 +42,25 @@ wire, each client derives the same count from the same events. A client that
 misses an event stays one behind until the next pull, which is why the counter
 resets when combat ends.
 
+## Setup: none
+
+At a ready check every client with the addon announces itself, all of them sort
+the same names, and each derives the same assignment — positions 1..N and the
+kicker count — without anyone typing anything. The chat list also shows who does
+*not* have it, which is easier to notice before the pull than during it.
+
+The ready check has to happen before the key is started: addon messaging is
+locked down while a run is underway, and the addon says so rather than failing
+quietly.
+
+Your interrupt is learned by watching: when one of your casts coincides with a
+mob's cast ending, that spell is a candidate, and two sightings lock it in. No
+per-class table of spell IDs to go stale. `/kickrot me` and `/kickrot spell`
+remain as manual overrides.
+
 ## Personal feedback
 
-Once `/kickrot me` and `/kickrot spell` are set, the box on a mob whose number
-is yours turns green when your interrupt is ready and grey with a cooldown sweep
+The box on a mob whose number is yours turns green when your interrupt is ready and grey with a cooldown sweep
 when it is not, and its border flashes when your interrupt lands.
 
 Your own cooldown is readable even inside a key: `isActive` on

@@ -17,6 +17,9 @@
 -- which is why the counter resets when combat ends.
 
 local DEFAULT_KICKERS = 3
+local PREFIX = "KickRot"
+local ROSTER_WINDOW = 3   -- seconds to collect replies after a ready check
+local OWN_KICK_WINDOW = 0.7
 local BOX_SIZE, BOX_OFFSET_Y = 36, 18
 
 -- Red plate, white border, white text. The border stays white, so the cast
@@ -176,16 +179,37 @@ local function RefreshAll()
 	end
 end
 
-local lastOwnKickAt = 0
+local lastOwnCast = { spellID = nil, at = 0 }
+local learnSeen = {}
 
--- Confirmation that the interrupt was yours: your cast succeeded and the mob's
--- cast ended within the same moment. interruptedBy would say so directly, but
--- it is secret and could not be compared against you.
-local function FlashIfMine(unit)
-	if GetTime() - lastOwnKickAt > 0.7 then return end
+-- Rather than ship a class table of interrupt IDs that goes stale every patch,
+-- the addon watches for its own cast landing on a mob's interrupt. Two sightings
+-- of the same spell are required, so one coincidence does not lock in the wrong
+-- one. Works for any class, spec and locale.
+local function LearnInterrupt(spellID)
+	learnSeen[spellID] = (learnSeen[spellID] or 0) + 1
+	if learnSeen[spellID] < 2 then return end
+
+	DB().spellID = spellID
+	local info = C_Spell.GetSpellInfo(spellID)
+	print("|cffffcc00KickRotation|r learned your interrupt: "
+		.. ((info and info.name) or spellID) .. ". Cooldown display is active.")
+end
+
+-- Your cast succeeded and a mob's cast ended in the same moment, so it was
+-- yours. interruptedBy would say so outright, but it is secret and cannot be
+-- compared against you.
+local function OnMobInterrupted(unit)
+	if not lastOwnCast.spellID or GetTime() - lastOwnCast.at > OWN_KICK_WINDOW then return end
+
+	if not DB().spellID then
+		LearnInterrupt(lastOwnCast.spellID)
+		return
+	end
+	if lastOwnCast.spellID ~= DB().spellID then return end
+
 	local box = boxes[unit]
 	if not box then return end
-
 	box.border:SetColorTexture(unpack(FLASH))
 	C_Timer.After(0.6, function()
 		if boxes[unit] then boxes[unit].border:SetColorTexture(unpack(BORDER)) end
@@ -255,7 +279,7 @@ local function CastEnded(unit, advance)
 	local wasCasting = casting[unit]
 	casting[unit] = nil
 	if advance and wasCasting then
-		FlashIfMine(unit)
+		OnMobInterrupted(unit)
 		Advance(unit)
 	else
 		Refresh(unit)
@@ -271,19 +295,69 @@ function handlers.UNIT_SPELLCAST_CHANNEL_STOP(unit) CastEnded(unit, false) end
 -- Leaving combat resyncs everyone: a client that missed an event would
 -- otherwise stay off by one for the rest of the dungeon.
 function handlers.UNIT_SPELLCAST_SUCCEEDED(unit, _, spellID)
-	local mine = DB().spellID
-	if unit ~= "player" or not mine or issecretvalue(spellID) then return end
-	if spellID == mine then
-		lastOwnKickAt = GetTime()
-	end
+	if unit ~= "player" or issecretvalue(spellID) then return end
+	lastOwnCast.spellID, lastOwnCast.at = spellID, GetTime()
 end
 
 function handlers.SPELL_UPDATE_COOLDOWN()
 	if DB().position then RefreshAll() end
 end
 
+-- Ready check: the last moment before the key starts, and the only window in
+-- which addon messaging is allowed -- it is locked down once a run is underway.
+-- Everyone announces themselves, everyone sorts the same names, so every client
+-- derives the same assignment with nobody configuring anything.
+local roster = {}
+local rosterPending = false
+
+local function AnnounceRoster()
+	rosterPending = false
+
+	local names = {}
+	for name in pairs(roster) do names[#names + 1] = name end
+	sort(names)
+	if #names == 0 then return end
+
+	local me = UnitName("player")
+	DB().kickers = #names
+	for i, name in ipairs(names) do
+		if name == me then DB().position = i end
+	end
+
+	print("|cffffcc00KickRotation|r " .. #names .. " in the group have the addon:")
+	for i, name in ipairs(names) do
+		print(format("  %d. %s%s", i, name, (name == me) and "  <-- you" or ""))
+	end
+	RefreshAll()
+end
+
+function handlers.READY_CHECK()
+	if C_ChatInfo.InChatMessagingLockdown and C_ChatInfo.InChatMessagingLockdown() then
+		print("|cffffcc00KickRotation|r addon messaging is locked down -- "
+			.. "run the ready check before the key is started.")
+		return
+	end
+
+	roster = { [UnitName("player")] = true }
+	if not rosterPending then
+		rosterPending = true
+		C_Timer.After(ROSTER_WINDOW, AnnounceRoster)
+	end
+	C_ChatInfo.SendAddonMessage(PREFIX, "HI:" .. UnitName("player"), "PARTY")
+end
+
+function handlers.CHAT_MSG_ADDON(prefix, text)
+	if prefix ~= PREFIX then return end
+	local name = text:match("^HI:(.+)$")
+	if name then roster[name] = true end
+end
+
 function handlers.PLAYER_REGEN_ENABLED()
 	KickRotation_Reset()
+end
+
+if C_ChatInfo.RegisterAddonMessagePrefix then
+	C_ChatInfo.RegisterAddonMessagePrefix(PREFIX)
 end
 
 local frame = CreateFrame("Frame")
