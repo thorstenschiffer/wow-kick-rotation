@@ -33,8 +33,19 @@ local boxes = {}    -- unit token -> frame
 local tracked = {}  -- unit token -> true
 local casting = {}  -- unit token -> true while an interruptible cast is up
 
+-- Created on first use rather than in ADDON_LOADED, which had to compare against
+-- the addon's folder name -- and that name is whatever the user's unzip produced.
+-- Only ever called from event handlers and the slash command, so the saved table
+-- has already been restored by the time this runs.
+local function DB()
+	if type(KickRotationDB) ~= "table" then
+		KickRotationDB = {}
+	end
+	return KickRotationDB
+end
+
 local function Kickers()
-	local n = KickRotationDB and tonumber(KickRotationDB.kickers)
+	local n = tonumber(DB().kickers)
 	return (n and n >= 1) and n or DEFAULT_KICKERS
 end
 
@@ -178,12 +189,6 @@ function handlers.PLAYER_REGEN_ENABLED()
 	KickRotation_Reset()
 end
 
-function handlers.ADDON_LOADED(name)
-	if name ~= "KickRotation" then return end
-	KickRotationDB = KickRotationDB or {}
-	KickRotationDB.kickers = tonumber(KickRotationDB.kickers) or DEFAULT_KICKERS
-end
-
 local frame = CreateFrame("Frame")
 for event in pairs(handlers) do
 	frame:RegisterEvent(event)
@@ -199,9 +204,9 @@ SLASH_KICKROTATION1 = "/kickrot"
 SlashCmdList.KICKROTATION = function(msg)
 	local n = tonumber(msg)
 	if n and n >= 1 then
-		KickRotationDB.kickers = floor(n)
+		DB().kickers = floor(n)
 		KickRotation_Reset()
-		print("|cffffcc00KickRotation|r kickers set to " .. KickRotationDB.kickers .. ".")
+		print("|cffffcc00KickRotation|r kickers set to " .. Kickers() .. ".")
 		return
 	end
 	if msg == "reset" then
