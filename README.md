@@ -23,6 +23,8 @@ the marker index is a secret value under Midnight's addon restrictions, so the
 addon can only tell that a mob is marked, never which icon it carries.
 
 - `/kickrot 4` — set the number of kickers (default 3)
+- `/kickrot me 2` — your own position in the rotation
+- `/kickrot spell Mind Freeze` — your interrupt, by name or ID
 - `/kickrot mode global` — one shared number on every marked mob
 - `/kickrot mode mob` — one counter per marked mob (default)
 - `/kickrot reset` — start over
@@ -39,6 +41,21 @@ Everyone who wants to see the numbers needs the addon; it sends nothing over the
 wire, each client derives the same count from the same events. A client that
 misses an event stays one behind until the next pull, which is why the counter
 resets when combat ends.
+
+## Personal feedback
+
+Once `/kickrot me` and `/kickrot spell` are set, the box on a mob whose number
+is yours turns green when your interrupt is ready and grey with a cooldown sweep
+when it is not, and its border flashes when your interrupt lands.
+
+Your own cooldown is readable even inside a key: `isActive` on
+`C_Spell.GetSpellCooldown` is flagged NeverSecret, so ready-or-not is a decision
+the addon is allowed to make. The remaining numbers may be secret, but
+`Cooldown:SetCooldown` accepts secrets, so the sweep still draws.
+
+Nobody else's cooldown can be shown. Theirs is secret, and asking them over
+addon comms is not possible either — messaging is locked down while a key is
+underway.
 
 ## Troubleshooting
 

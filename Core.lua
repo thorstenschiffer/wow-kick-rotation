@@ -24,6 +24,9 @@ local BOX_SIZE, BOX_OFFSET_Y = 36, 18
 local BORDER = { 1, 1, 1, 1 }
 local IDLE = { 0.50, 0.04, 0.04, 0.92 }
 local ACTIVE = { 0.92, 0.11, 0.11, 0.96 }
+local MINE = { 0.10, 0.55, 0.12, 0.95 }    -- your turn, your kick is ready
+local MINE_CD = { 0.28, 0.28, 0.30, 0.92 } -- your turn, but your kick is down
+local FLASH = { 0.30, 1.00, 0.35, 1 }      -- your interrupt just landed
 
 -- Nameplates sit low and overlap each other constantly. DIALOG lifts the box
 -- clear of all of them; SetFixedFrameStrata stops the nameplate parent from
@@ -51,6 +54,15 @@ end
 local function Kickers()
 	local n = tonumber(DB().kickers)
 	return (n and n >= 1) and n or DEFAULT_KICKERS
+end
+
+-- Your own cooldown: startTime and duration may be secret, but isActive is
+-- flagged NeverSecret, so the ready/down decision is allowed even in a key.
+-- The secret numbers still render, because SetCooldown accepts secrets.
+local function MyCooldown()
+	local id = DB().spellID
+	if not id then return nil end
+	return C_Spell.GetSpellCooldown(id)
 end
 
 local function Mode()
@@ -93,6 +105,11 @@ local function AcquireBox(unit)
 	box.border:SetColorTexture(unpack(BORDER))
 
 	box.label = box:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	box.cd = CreateFrame("Cooldown", nil, box, "CooldownFrameTemplate")
+	box.cd:SetAllPoints()
+	box.cd:SetDrawEdge(false)
+	box.cd:Hide()
+
 	box.label:SetPoint("CENTER")
 	box.label:SetTextColor(1, 1, 1)
 	local font = box.label:GetFont()
@@ -129,9 +146,27 @@ local function Refresh(unit)
 	end
 	box:SetFrameLevel(LEVEL)
 
-	local c = casting[unit] and ACTIVE or IDLE
+	local n = Number(unit)
+	local isMine = DB().position == n
+	local cd = isMine and MyCooldown() or nil
+	local onCooldown = cd and cd.isActive == true
+
+	local c
+	if isMine then
+		c = onCooldown and MINE_CD or MINE
+	else
+		c = casting[unit] and ACTIVE or IDLE
+	end
 	box.bg:SetColorTexture(c[1], c[2], c[3], c[4])
-	box.label:SetText(Number(unit))
+
+	if cd and onCooldown then
+		box.cd:SetCooldown(cd.startTime, cd.duration)
+		box.cd:Show()
+	else
+		box.cd:Hide()
+	end
+
+	box.label:SetText(n)
 	box:Show()
 end
 
@@ -139,6 +174,22 @@ local function RefreshAll()
 	for unit in pairs(tracked) do
 		Refresh(unit)
 	end
+end
+
+local lastOwnKickAt = 0
+
+-- Confirmation that the interrupt was yours: your cast succeeded and the mob's
+-- cast ended within the same moment. interruptedBy would say so directly, but
+-- it is secret and could not be compared against you.
+local function FlashIfMine(unit)
+	if GetTime() - lastOwnKickAt > 0.7 then return end
+	local box = boxes[unit]
+	if not box then return end
+
+	box.border:SetColorTexture(unpack(FLASH))
+	C_Timer.After(0.6, function()
+		if boxes[unit] then boxes[unit].border:SetColorTexture(unpack(BORDER)) end
+	end)
 end
 
 local function Advance(unit)
@@ -204,6 +255,7 @@ local function CastEnded(unit, advance)
 	local wasCasting = casting[unit]
 	casting[unit] = nil
 	if advance and wasCasting then
+		FlashIfMine(unit)
 		Advance(unit)
 	else
 		Refresh(unit)
@@ -218,6 +270,18 @@ function handlers.UNIT_SPELLCAST_CHANNEL_STOP(unit) CastEnded(unit, false) end
 
 -- Leaving combat resyncs everyone: a client that missed an event would
 -- otherwise stay off by one for the rest of the dungeon.
+function handlers.UNIT_SPELLCAST_SUCCEEDED(unit, _, spellID)
+	local mine = DB().spellID
+	if unit ~= "player" or not mine or issecretvalue(spellID) then return end
+	if spellID == mine then
+		lastOwnKickAt = GetTime()
+	end
+end
+
+function handlers.SPELL_UPDATE_COOLDOWN()
+	if DB().position then RefreshAll() end
+end
+
 function handlers.PLAYER_REGEN_ENABLED()
 	KickRotation_Reset()
 end
@@ -242,6 +306,31 @@ SlashCmdList.KICKROTATION = function(msg)
 		print("|cffffcc00KickRotation|r kickers set to " .. Kickers() .. ".")
 		return
 	end
+	local cmd, rest = msg:match("^(%S+)%s+(.+)$")
+
+	if cmd == "me" then
+		local pos = tonumber(rest)
+		if pos and pos >= 1 then
+			DB().position = floor(pos)
+			RefreshAll()
+			print("|cffffcc00KickRotation|r you are kicker " .. DB().position .. ".")
+			return
+		end
+	end
+
+	if cmd == "spell" then
+		-- Accepts a name or an ID, so no interrupt IDs have to be hardcoded.
+		local info = C_Spell.GetSpellInfo(tonumber(rest) or rest)
+		if not info then
+			print("|cffffcc00KickRotation|r no spell found for '" .. rest .. "'.")
+			return
+		end
+		DB().spellID = info.spellID
+		RefreshAll()
+		print("|cffffcc00KickRotation|r your interrupt: " .. info.name .. " (" .. info.spellID .. ").")
+		return
+	end
+
 	if msg == "mode global" or msg == "mode mob" then
 		DB().mode = (msg == "mode global") and "global" or "per-mob"
 		KickRotation_Reset()
@@ -253,7 +342,11 @@ SlashCmdList.KICKROTATION = function(msg)
 		print("|cffffcc00KickRotation|r reset to 1.")
 		return
 	end
+	local me = DB().position and ("kicker " .. DB().position) or "not set"
+	local spell = DB().spellID and (C_Spell.GetSpellInfo(DB().spellID) or {}).name or "not set"
 	print("|cffffcc00KickRotation|r kickers: " .. Kickers() .. ", mode: " .. Mode()
-		.. ". /kickrot <n> sets the kicker count, /kickrot mode global|mob switches"
-		.. " between one shared number and one per marked mob, /kickrot reset starts over.")
+		.. ", you: " .. me .. ", your interrupt: " .. spell)
+	print("  /kickrot <n>  kicker count   |  /kickrot me <n>  your own position")
+	print("  /kickrot spell <name|id>  your interrupt, for the cooldown display")
+	print("  /kickrot mode global|mob  |  /kickrot reset")
 end
