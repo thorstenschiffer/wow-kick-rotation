@@ -62,8 +62,52 @@ end
 -- Your own cooldown: startTime and duration may be secret, but isActive is
 -- flagged NeverSecret, so the ready/down decision is allowed even in a key.
 -- The secret numbers still render, because SetCooldown accepts secrets.
+-- Candidate interrupts per class. Several entries where specs differ or where
+-- two IDs for the same ability exist; the first one the player actually knows
+-- wins. A wrong or missing ID therefore costs nothing -- that player simply
+-- falls through to the learning path below.
+local INTERRUPTS = {
+	DEATHKNIGHT = { 47528 },         -- Mind Freeze
+	DEMONHUNTER = { 183752 },        -- Disrupt
+	DRUID       = { 106839, 93985 }, -- Skull Bash
+	EVOKER      = { 351338 },        -- Quell
+	HUNTER      = { 187707, 147362 },-- Muzzle (Survival), Counter Shot
+	MAGE        = { 2139 },          -- Counterspell
+	MONK        = { 116705 },        -- Spear Hand Strike
+	PALADIN     = { 96231, 31935 },  -- Rebuke, Avenger's Shield (Protection)
+	PRIEST      = { 15487 },         -- Silence (Shadow)
+	ROGUE       = { 1766 },          -- Kick
+	SHAMAN      = { 57994 },         -- Wind Shear
+	WARLOCK     = { 19647 },         -- Spell Lock (Felhunter, pet spell bank)
+	WARRIOR     = { 6552 },          -- Pummel
+}
+
+local function SpellKnown(id)
+	local known = C_SpellBook and C_SpellBook.IsSpellKnown
+	if known then
+		return known(id) or known(id, 1) -- 1 = pet spell bank, for Spell Lock
+	end
+	return IsPlayerSpell and IsPlayerSpell(id)
+end
+
+local function DetectInterrupt()
+	local _, class = UnitClass("player")
+	local ids = (type(class) == "string") and INTERRUPTS[class]
+	if not ids then return nil end
+
+	for _, id in ipairs(ids) do
+		if SpellKnown(id) then return id end
+	end
+	return nil
+end
+
+-- Configured or learned value wins, so an override always sticks.
+local function MyInterrupt()
+	return DB().spellID or DetectInterrupt()
+end
+
 local function MyCooldown()
-	local id = DB().spellID
+	local id = MyInterrupt()
 	if not id then return nil end
 	return C_Spell.GetSpellCooldown(id)
 end
@@ -202,11 +246,12 @@ end
 local function OnMobInterrupted(unit)
 	if not lastOwnCast.spellID or GetTime() - lastOwnCast.at > OWN_KICK_WINDOW then return end
 
-	if not DB().spellID then
+	local mine = MyInterrupt()
+	if not mine then
 		LearnInterrupt(lastOwnCast.spellID)
 		return
 	end
-	if lastOwnCast.spellID ~= DB().spellID then return end
+	if lastOwnCast.spellID ~= mine then return end
 
 	local box = boxes[unit]
 	if not box then return end
@@ -313,20 +358,28 @@ local rosterPending = false
 local function AnnounceRoster()
 	rosterPending = false
 
-	local names = {}
-	for name in pairs(roster) do names[#names + 1] = name end
-	sort(names)
-	if #names == 0 then return end
+	local kickers, benched = {}, {}
+	for name, hasInterrupt in pairs(roster) do
+		local into = hasInterrupt and kickers or benched
+		into[#into + 1] = name
+	end
+	sort(kickers)
+	sort(benched)
+	if #kickers == 0 and #benched == 0 then return end
 
 	local me = UnitName("player")
-	DB().kickers = #names
-	for i, name in ipairs(names) do
+	DB().position = nil
+	DB().kickers = #kickers
+	for i, name in ipairs(kickers) do
 		if name == me then DB().position = i end
 	end
 
-	print("|cffffcc00KickRotation|r " .. #names .. " in the group have the addon:")
-	for i, name in ipairs(names) do
+	print("|cffffcc00KickRotation|r kick order:")
+	for i, name in ipairs(kickers) do
 		print(format("  %d. %s%s", i, name, (name == me) and "  <-- you" or ""))
+	end
+	for _, name in ipairs(benched) do
+		print(format("  -- %s (addon, no interrupt)", name))
 	end
 	RefreshAll()
 end
@@ -338,18 +391,19 @@ function handlers.READY_CHECK()
 		return
 	end
 
-	roster = { [UnitName("player")] = true }
+	local mine = MyInterrupt() and "1" or "0"
+	roster = { [UnitName("player")] = (mine == "1") }
 	if not rosterPending then
 		rosterPending = true
 		C_Timer.After(ROSTER_WINDOW, AnnounceRoster)
 	end
-	C_ChatInfo.SendAddonMessage(PREFIX, "HI:" .. UnitName("player"), "PARTY")
+	C_ChatInfo.SendAddonMessage(PREFIX, "HI:" .. UnitName("player") .. ":" .. mine, "PARTY")
 end
 
 function handlers.CHAT_MSG_ADDON(prefix, text)
 	if prefix ~= PREFIX then return end
-	local name = text:match("^HI:(.+)$")
-	if name then roster[name] = true end
+	local name, hasInterrupt = text:match("^HI:(.+):([01])$")
+	if name then roster[name] = (hasInterrupt == "1") end
 end
 
 function handlers.PLAYER_REGEN_ENABLED()
