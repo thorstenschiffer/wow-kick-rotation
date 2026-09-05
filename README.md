@@ -22,13 +22,13 @@ Mark mobs with any raid marker. Which marker does not matter and cannot matter:
 the marker index is a secret value under Midnight's addon restrictions, so the
 addon can only tell that a mob is marked, never which icon it carries.
 
-- `/kickrot 4` — set the number of kickers (default 3)
-- `/kickrot me 2` — your own position in the rotation
-- `/kickrot spell Mind Freeze` — your interrupt, by name or ID
-- `/kickrot mode global` — one shared number on every marked mob
-- `/kickrot mode mob` — one counter per marked mob (default)
-- `/kickrot show` — show your position again
-- `/kickrot reset` — start over
+- `/kickrota 4` — set the number of kickers (default 3)
+- `/kickrota me 2` — your own position in the rotation
+- `/kickrota spell Mind Freeze` — your interrupt, by name or ID
+- `/kickrota mode global` — one shared number on every marked mob
+- `/kickrota mode mob` — one counter per marked mob (default)
+- `/kickrota show` — show your position again
+- `/kickrota reset` — start over
 - Keybind under Key Bindings → AddOns → Kick Rotation
 
 In per-mob mode each newly marked mob is handed the next start number, so two
@@ -53,7 +53,7 @@ kicker count — without anyone typing anything. The chat list also shows who do
 The assignment also appears as a banner in the middle of the screen — "You are
 kicker 2 of 3" — because a chat line is gone by the time the pull starts. It is
 shown again when the key actually starts, since minutes can pass in between, and
-`/kickrot show` brings it back on demand.
+`/kickrota show` brings it back on demand.
 
 The ready check has to happen before the key is started: addon messaging is
 locked down while a run is underway, and the addon says so rather than failing
@@ -67,7 +67,7 @@ and is not counted.
 If the table misses a spell, that player falls back to learning it: a cast of
 theirs coinciding with a mob's cast ending is a candidate, and two sightings
 lock it in. So a wrong or missing ID costs a little time, not correctness.
-`/kickrot me` and `/kickrot spell` remain as manual overrides.
+`/kickrota me` and `/kickrota spell` remain as manual overrides.
 
 ## Personal feedback
 

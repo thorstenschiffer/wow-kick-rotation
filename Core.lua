@@ -468,7 +468,7 @@ end)
 BINDING_HEADER_KICKROTATION = "Kick Rotation"
 BINDING_NAME_KICKROTATION_RESET = "Reset to 1"
 
-SLASH_KICKROTATION1 = "/kickrot"
+SLASH_KICKROTATION1 = "/kickrota"
 SlashCmdList.KICKROTATION = function(msg)
 	local n = tonumber(msg)
 	if n and n >= 1 then
@@ -521,8 +521,8 @@ SlashCmdList.KICKROTATION = function(msg)
 	local spell = DB().spellID and (C_Spell.GetSpellInfo(DB().spellID) or {}).name or "not set"
 	print("|cffffcc00KickRotation|r kickers: " .. Kickers() .. ", mode: " .. Mode()
 		.. ", you: " .. me .. ", your interrupt: " .. spell)
-	print("  /kickrot <n>  kicker count   |  /kickrot me <n>  your own position")
-	print("  /kickrot spell <name|id>  your interrupt, for the cooldown display")
-	print("  /kickrot show  your position as a banner  |  /kickrot reset")
-	print("  /kickrot mode global|mob")
+	print("  /kickrota <n>  kicker count   |  /kickrota me <n>  your own position")
+	print("  /kickrota spell <name|id>  your interrupt, for the cooldown display")
+	print("  /kickrota show  your position as a banner  |  /kickrota reset")
+	print("  /kickrota mode global|mob")
 end
