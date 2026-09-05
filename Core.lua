@@ -539,7 +539,8 @@ SlashCmdList.KICKROTATION = function(msg)
 		return
 	end
 	local me = DB().position and ("kicker " .. DB().position) or "not set"
-	local spell = DB().spellID and (C_Spell.GetSpellInfo(DB().spellID) or {}).name or "not set"
+	local id = MyInterrupt()
+	local spell = id and (C_Spell.GetSpellInfo(id) or {}).name or "not set"
 	print("|cffffcc00KickRotation|r kickers: " .. Kickers() .. ", mode: " .. Mode()
 		.. ", you: " .. me .. ", your interrupt: " .. spell)
 	print("  /kickrota <n>  kicker count   |  /kickrota me <n>  your own position")
