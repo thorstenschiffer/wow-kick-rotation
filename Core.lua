@@ -69,7 +69,7 @@ end
 local INTERRUPTS = {
 	DEATHKNIGHT = { 47528 },         -- Mind Freeze
 	DEMONHUNTER = { 183752 },        -- Disrupt
-	DRUID       = { 106839, 93985 }, -- Skull Bash
+	DRUID       = { 106839 },        -- Skull Bash (93985 is its effect, not castable)
 	EVOKER      = { 351338 },        -- Quell
 	HUNTER      = { 187707, 147362 },-- Muzzle (Survival), Counter Shot
 	MAGE        = { 2139 },          -- Counterspell
@@ -82,12 +82,18 @@ local INTERRUPTS = {
 	WARRIOR     = { 6552 },          -- Pummel
 }
 
+-- IsPlayerSpell first: several interrupts are granted by talent or spec rather
+-- than sitting in the spellbook, and IsSpellKnown answers false for those --
+-- which is why a Guardian druid with Skull Bash came back as "not set".
+-- It is deprecated but still present; the spellbook checks are the fallbacks.
 local function SpellKnown(id)
+	if IsPlayerSpell and IsPlayerSpell(id) then return true end
+
 	local known = C_SpellBook and C_SpellBook.IsSpellKnown
 	if known then
 		return known(id) or known(id, 1) -- 1 = pet spell bank, for Spell Lock
 	end
-	return IsPlayerSpell and IsPlayerSpell(id)
+	return false
 end
 
 local function DetectInterrupt()
@@ -508,6 +514,21 @@ SlashCmdList.KICKROTATION = function(msg)
 		print("|cffffcc00KickRotation|r mode: " .. Mode() .. ".")
 		return
 	end
+	if msg == "debug" then
+		local _, class = UnitClass("player")
+		print("|cffffcc00KickRotation|r class = " .. tostring(class))
+		local known = C_SpellBook and C_SpellBook.IsSpellKnown
+		for _, id in ipairs(INTERRUPTS[class] or {}) do
+			local info = C_Spell.GetSpellInfo(id)
+			print(format("  %d %s  IsPlayerSpell=%s  IsSpellKnown=%s  pet=%s",
+				id, (info and info.name) or "?",
+				tostring(IsPlayerSpell and IsPlayerSpell(id)),
+				tostring(known and known(id)),
+				tostring(known and known(id, 1))))
+		end
+		print("  detected: " .. tostring(MyInterrupt()))
+		return
+	end
 	if msg == "show" then
 		ShowAssignment(10)
 		return
@@ -524,5 +545,6 @@ SlashCmdList.KICKROTATION = function(msg)
 	print("  /kickrota <n>  kicker count   |  /kickrota me <n>  your own position")
 	print("  /kickrota spell <name|id>  your interrupt, for the cooldown display")
 	print("  /kickrota show  your position as a banner  |  /kickrota reset")
+	print("  /kickrota debug  why your interrupt was or was not detected")
 	print("  /kickrota mode global|mob")
 end
