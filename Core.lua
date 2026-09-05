@@ -5,7 +5,9 @@
 --     nil for an unmarked one. A presence test (~= nil) is legal; reading which
 --     marker it is, is not. So any marker qualifies -- we cannot tell them apart.
 --   * The unit's NPC ID is unreachable (unit identity is secret), so mobs cannot
---     be filtered by type. The marker, set by a human, is the filter.
+--     be filtered by type. The marker, set by a human, is the filter. Secrecy is
+--     not combat-gated here: in a key everything is secret from the moment the
+--     keystone is activated, so there is no pre-pull window to read identity in.
 --   * notInterruptible is a secret boolean and cannot be tested. UNIT_SPELLCAST_
 --     INTERRUPTIBLE firing is the substitute: the event itself is the information.
 --   * The counter is our own local number, so displaying it is unrestricted.
